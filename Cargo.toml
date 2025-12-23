@@ -1,0 +1,17 @@
+[package]
+name = "miniweb"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "miniweb"
+crate-type = ["rlib", "cdylib"]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = "z"
+codegen-units = 1
+lto = "fat"

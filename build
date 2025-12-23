@@ -1,0 +1,23 @@
+#!/usr/bin/bash
+
+LIBNAME="miniweb"
+
+profile=$1
+
+if [[ $profile == "" ]]; then
+    profile="dev"
+elif [[ $profile != "dev" && $profile != "release" ]]; then
+    echo Invalid profile selected: \"$profile\"
+    exit
+fi
+
+# Build our library
+cargo build --profile $profile --target wasm32-unknown-unknown --lib
+
+case $profile in
+    dev ) outdir="debug" ;;
+    release ) outdir="release" ;;
+esac
+
+# Copy it to the main directory
+cp ./target/wasm32-unknown-unknown/$outdir/$LIBNAME.wasm ./web/app.wasm

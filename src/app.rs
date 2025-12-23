@@ -1,0 +1,84 @@
+use core::cell::UnsafeCell;
+
+#[cfg(not(test))]
+#[cfg(target_arch = "wasm32")]
+#[panic_handler]
+fn panic_handler(info: &core::panic::PanicInfo) -> ! {
+    let msg = info.message().as_str();
+    let location = info.location().unwrap();
+
+    crate::js::panic(msg, location.file(), location.line());
+
+    loop {}
+}
+
+pub trait AppHandler {
+    /// The animation loop itself (identical to update)
+    fn draw(&mut self);
+}
+
+pub struct AppCell<T: AppHandler>(UnsafeCell<Option<T>>);
+unsafe impl<T: AppHandler> Send for AppCell<T> {}
+unsafe impl<T: AppHandler> Sync for AppCell<T> {}
+
+impl<T: AppHandler> AppCell<T> {
+    pub const fn new() -> Self {
+        Self(UnsafeCell::new(None))
+    }
+
+    pub const fn is_init(&self) -> bool {
+        unsafe { & *self.0.get() }.is_some()
+    }
+
+    pub unsafe fn init(&self, app: T) {
+        assert!(!self.is_init(), "The app is already initialised.");
+
+        unsafe { &mut *self.0.get() }.replace(app);
+    }
+
+    pub const unsafe fn get_mut(&self) -> &mut T {
+        assert!(self.is_init(), "The app isn't initialised");
+
+        unsafe { (&mut *self.0.get()).as_mut().unwrap() }
+    }
+
+    pub const unsafe fn get(&self) -> &T {
+        assert!(self.is_init(), "The app isn't initialised");
+
+        unsafe { (&*self.0.get()).as_ref().unwrap() }
+    }
+}
+
+/// The global macro for generating an app 
+#[macro_export]
+macro_rules! make_app {
+    ($ty:ident) => {
+        static APP: AppCell<$ty> = AppCell::new();
+
+        const fn __() {
+            __satisfies_trait(unsafe { APP.get() });
+        }
+        const fn __satisfies_trait<T: AppHandler>(_: &T) {}
+
+        unsafe fn init_app(app: $ty) {
+            unsafe { APP.init(app) };
+        } 
+
+        unsafe fn get_app<'a>() -> &'a mut $ty {
+            unsafe { APP.get_mut() }
+        }
+
+        
+        #[unsafe(no_mangle)]
+        pub extern "C" fn __main() {
+            let app = main();
+            
+            unsafe { init_app(app) };
+        }
+
+        #[unsafe(no_mangle)]
+        pub extern "C" fn __draw() {
+            unsafe { get_app() }.draw();
+        }
+    };
+}

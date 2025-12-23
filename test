@@ -1,0 +1,10 @@
+#!/usr/bin/bash
+
+with_miri=$1
+
+if [[ $with_miri != "miri" && $with_miri != "" ]]; then
+    echo Incorrect argument. The only valid argument is \"miri\"
+    exit
+fi
+
+cargo $with_miri test --lib

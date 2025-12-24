@@ -1,7 +1,4 @@
-use core::{mem::MaybeUninit, ops::{Index, IndexMut, Shr}};
-
-#[cfg(test)]
-use crate::println;
+use core::{mem::MaybeUninit, ops::{Index, IndexMut}};
 
 /// A vector of a constant size. Allows for push/pop operations, but,
 /// has an upper limit to its capacity.
@@ -221,222 +218,24 @@ mod tests {
     }
 }
 
-type BlockBitmap = u32;
+type BlockBitmap = u64;
 
 const BITMAP_BITS: usize = BlockBitmap::BITS as usize;
 const PAGE_SIZE: usize = 2usize.pow(16);
 
-const BLOCK_SIZE: usize = 64;
+const BLOCK_SIZE: usize = 1024;
 const BLOCKS_LEN: usize = PAGE_SIZE/BLOCK_SIZE;
-const BLOCK_BITMAPS: usize = BLOCKS_LEN / BITMAP_BITS;
-
-#[derive(Clone, Copy)]
-struct Block {
-    blocks: usize,
-    index: usize
-}
-
-impl Block {
-    fn new(index: usize, blocks: usize) -> Self {
-        assert!(blocks > 0);
-
-        Self {
-            blocks,
-            index
-        }
-    }
-
-    /// Does this block have the exact capacity?
-    fn is_exact(&self, blocks: usize) -> bool {
-        blocks == self.blocks
-    }
-
-    /// Does this block have enough capacity?
-    fn can_accomodate(&self, blocks: usize) -> bool {
-        blocks <= self.blocks
-    }
-
-    /// Consume this block partially and return a new one for use
-    fn take_partially(&mut self, blocks: usize) -> Block {
-        assert!(blocks < self.blocks);
-
-        let new_index = self.index+self.blocks-blocks;
-        self.blocks -= blocks;
-
-        Block::new(new_index, blocks)
-    }
-
-    fn can_join_right(&self, block: Block) -> bool {
-        self.index+self.blocks == block.index
-    }
-
-    /// Join a new block from the right if its position actually is to the left
-    fn join_right(&mut self, block: Block) {
-        assert!(self.can_join_right(block));
-
-        self.blocks += block.blocks;
-    }
-}
-
-struct BlockPool<const S: usize> {
-    index: usize,
-    blocks: ConstVec<Block, S>
-}
-
-impl<const S: usize> BlockPool<S> {
-    
-    // Create a new block pool with a single block initialised to the entire capacity
-    fn new(index: usize) -> Self {
-        let mut blocks = ConstVec::new();
-        blocks.push(Block::new(index, S));
-
-        Self {
-            index,
-            blocks
-        }
-    }
-
-    /// Try to get a block that can satisfy the requested amount of blocks
-    fn find_block(&self, blocks: usize) -> Option<usize> {
-        for ind in 0..self.blocks.len() {
-
-            if self.blocks[ind].can_accomodate(blocks) {
-                return Some(ind)
-            }
-        }
-
-        None
-    }
-
-    /// Get a new block from the list (if present)
-    /// 
-    /// This will either split the first available block, or take an entire one
-    fn get_block(&mut self, blocks: usize) -> Option<Block> {
-        let ind = self.find_block(blocks)?;
-
-        let ret = if self.blocks[ind].is_exact(blocks) {
-            self.blocks.swap_pop(ind)
-        } else {
-            self.blocks[ind].take_partially(blocks)
-        };
-
-        Some(ret)
-    }
-
-    fn return_block(&mut self, block: Block) {
-        assert!(block.index >= self.index);
-        assert!(block.index < self.index+S);
-
-        // In any other case we're just going to push our block alone
-        let ind = self.blocks.len();
-        self.blocks.push(block);
-
-        // Now do the same, but for our block
-        for jind in 0..self.blocks.len() {
-
-            // It must not be ours
-            if jind == ind {
-                continue;
-            }
-
-            #[cfg(test)]
-            std::println!("<Block {}, {}>", self.blocks[ind].index, self.blocks[ind].blocks);
-
-            // If we found a block that can actually be joined to ours
-            if self.blocks[ind].can_join_right(self.blocks[jind]) {
-
-                // Pop it from the list
-                let right_block = self.blocks.swap_pop(jind);
-
-                // Join it to the right to our block
-                self.blocks[ind].join_right(right_block);
-
-                break
-            }
-        }
-
-        for jind in 0..self.blocks.len() {
-
-            // It must not be ours
-            if jind == ind {
-                continue;
-            }
-
-            // If we found a block that can actually be joined to ours
-            if self.blocks[jind].can_join_right(self.blocks[ind]) {
-
-                // Pop it from the list
-                let right_block = self.blocks.swap_pop(ind);
-
-                // Join it to the right to our block
-                self.blocks[jind].join_right(right_block);
-
-                break
-            }
-        }
-    }
-
-    /// The amount of blocks that this pool currently has
-    fn len(&self) -> usize {
-        self.blocks.len()
-    }
-}
-
-#[cfg(test)]
-mod test_blockpool {
-    use super::*;
-
-    #[test]
-    fn test_joining() {
-        let mut pool: BlockPool<10> = BlockPool::new(0);
-        // # # # # # # # # # #
-
-        assert_eq!(pool.len(), 1);
-
-        // Currently, we have 10 blocks. Let's take 3
-
-        let three = pool.get_block(3).unwrap();
-        // # # # # # # # + _ _
-
-        // Let's get a few more
-
-        let two = pool.get_block(2).unwrap();
-        // # # # # # + _ + _ _
-
-        let four = pool.get_block(4).unwrap();
-        // # + _ _ _ + _ + _ _
-
-        assert_eq!(pool.len(), 1);
-
-        // Now, let's put some back
-
-        pool.return_block(three);
-        // # + _ _ _ + _ # # #
-
-        assert_eq!(pool.len(), 2);
-
-        pool.return_block(two);
-        // # + _ _ _ # # # # #
-
-        assert_eq!(pool.len(), 2);
-
-        pool.return_block(four);
-        // # # # # # # # # # #
-        
-        assert_eq!(pool.len(), 1);
-    }
-}
 
 struct PageBlock {
     /// The block array. It stores bitmaps of available blocks
-    blocks: [BlockBitmap; BLOCK_BITMAPS],
+    blocks: BlockBitmap,
 
     /// This is a per-block array and it allows tracking how many subsequent blocks are
     /// allocated per block. This is particularly useful when deallocating blocks.
-    taken_blocks: [[u8; BITMAP_BITS]; BLOCK_BITMAPS],
+    taken_blocks: [u8; BITMAP_BITS],
     
     /// The amount of freely available blocks
-    available_blocks: usize
+    available_blocks: usize,
 }
 
 impl PageBlock {
@@ -447,9 +246,11 @@ impl PageBlock {
 
     pub fn new() -> Self {
         Self {
-            blocks: [0; BLOCK_BITMAPS],
+            blocks: 0,
             available_blocks: BLOCKS_LEN,
-            taken_blocks: [[0; BITMAP_BITS]; BLOCK_BITMAPS]
+            taken_blocks: [0; BITMAP_BITS],
+
+
         }
     }
 
@@ -461,18 +262,17 @@ impl PageBlock {
         let mut ret = 0;
         
         for i in 0..blocks {
-            ret += 1 << (BITMAP_BITS-1);
-            ret = ret >> 1;
+            ret += 1 << (BITMAP_BITS-(i+1));
         }
 
         ret
     }
 
-    /// Try find a free, available set of blocks for the provided amount of blocks
-    /// (each is a 64 byte chunk).
+    /// Try find a free, available set of blocks for the provided amount of blocks.
+    /// The complexity is O(n), where n is the amount of bits to scan
     /// 
     /// This will return the bitset index and the block index itself
-    pub fn get_blocks(&self, blocks: usize) -> Option<(usize, usize)> {
+    pub fn get_blocks(&self, blocks: usize) -> Option<usize> {
         assert!((1..=BITMAP_BITS).contains(&blocks));
 
         if blocks > self.available_blocks {
@@ -480,23 +280,21 @@ impl PageBlock {
         }
 
         let scan_bitmap: BlockBitmap = Self::make_block_bitmap(blocks);
-
-        for (ind, block_set) in self.blocks.iter().copied().enumerate() {
             
-            // Because we have to account for our header, the first block will always
-            // have an offset
-            let mut bind: usize = if ind == 0 { Self::BLOCK_OFFSET } else { 0 };
+        // Because we have to account for our header, the first block will always
+        // have an offset
+        let offset = Self::BLOCK_OFFSET;
 
-            while bind < BITMAP_BITS-blocks {
-                let bitmap = scan_bitmap >> bind;
+        // We're sliding a window, so at some point we'll have a maximum index after
+        // which there are no more bits left to scan
+        let max_index = BITMAP_BITS-blocks;
 
-                if (!block_set & bitmap) == bitmap {
-                    return Some((ind, bind));
-                }
-
-                bind += blocks;
+        for bind in offset..max_index {
+            let bitmap = scan_bitmap >> bind;
+    
+            if (!self.blocks & bitmap) == bitmap {
+                return Some(bind);
             }
-            
         }
 
         None
@@ -504,43 +302,39 @@ impl PageBlock {
 
     /// Actually take the amount of requested blocks
     pub fn take_blocks(&mut self, blocks: usize) -> Option<usize> {
-        let (bs_ind, bind) = self.get_blocks(blocks)?;
+        let bind = self.get_blocks(blocks)?;
 
         // Mark on this block that it took also these subsequent blocks
         // It's guaranteed that a single blockset can't take more than 32 blocks
-        self.taken_blocks[bs_ind][bind] = blocks as u8;
+        self.taken_blocks[bind] = blocks as u8;
 
         let taken_bitmap = Self::make_block_bitmap(blocks) >> bind;
 
-        self.blocks[bs_ind] = self.blocks[bs_ind] | taken_bitmap;
+        self.blocks = self.blocks | taken_bitmap;
         self.available_blocks -= blocks;
         
-        Some((bs_ind * BITMAP_BITS) + bind)
+        Some(bind)
     }
 
-    pub fn free_blocks(&mut self, block_ind: usize) {
-        let bs_ind = block_ind / BITMAP_BITS;
-        let bind = block_ind % BITMAP_BITS;
-
-        let taken_blocks = self.taken_blocks[bs_ind][bind] as usize;
+    pub fn free_blocks(&mut self, bind: usize) {
+        let taken_blocks = self.taken_blocks[bind] as usize;
         assert!(taken_blocks > 0, "Deallocating empty blocks");
 
         // Reset the amount of taken blocks
-        self.taken_blocks[bs_ind][bind] = 0;
+        self.taken_blocks[bind] = 0;
         let taken_bitmap = Self::make_block_bitmap(taken_blocks) >> bind;
 
         // Remove taken blocks from the bitmap
-        self.blocks[bs_ind] = !(!self.blocks[bs_ind] | taken_bitmap);
+        self.blocks = !(!self.blocks | taken_bitmap);
         
         self.available_blocks += taken_blocks;
     }
 }
 
-
 #[cfg(test)]
 mod tests_block {
 
-    use crate::{alloc::PageBlock, println};
+    use crate::alloc::PageBlock;
     
     #[test]
     fn test_page_blocks() {

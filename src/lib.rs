@@ -5,7 +5,6 @@
 extern crate std;
 
 mod alloc;
-
 mod app;
 pub use app::*;
 
@@ -16,8 +15,19 @@ pub use js::*;
 mod gl;
 pub use gl::*;
 
-unsafe extern "C" {
-    static __heap_base: usize;
+/// Get the heap base (the address from which the heap starts) 
+pub fn heap_base() -> *const u8 {
+
+    unsafe extern "C" {
+        static __heap_base: u8;
+    }
+
+    unsafe { &__heap_base as *const u8 }
+} 
+
+/// Ge the initial amount of pages allocated by rust
+pub fn initial_pages() -> usize {
+    (heap_base() as usize).div_ceil(2usize.pow(16))
 }
 
 struct App;
@@ -28,8 +38,11 @@ impl AppHandler for App {
 }
 
 fn main() -> App {
-    println("This works...??? How...?");
-    println("No way! This is impossible! There's no actual way!");
+    println_number(heap_base() as usize);
+    println_number((initial_pages() * 2usize.pow(16)) - heap_base() as usize);
+
+    println_number(initial_pages() as usize);
+    println_number(allocated_pages());
 
     unsafe {
         glClearColor(0.2, 0.8, 1.0, 1.0);

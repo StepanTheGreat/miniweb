@@ -2,6 +2,10 @@ mod js {
     use core::ptr::null;
 
     unsafe extern "C" {
+        fn js_request_pages(pages: usize);
+
+        fn js_allocated_pages() -> usize;
+
         fn js_println(start: *const u8, len: usize);
 
         fn js_alert(start: *const u8, len: usize);
@@ -11,6 +15,22 @@ mod js {
             file: *const u8, file_len: usize,
             line: u32
         );
+
+        fn js_println_number(number: usize);
+    }
+
+    /// Request an amount of pages to be allocated from JS 
+    pub fn request_pages(pages: usize) {
+        unsafe { js_request_pages(pages) }
+    }
+
+    /// Get the current amount of allocated pages from JS
+    pub fn allocated_pages() -> usize {
+        unsafe { js_allocated_pages() }
+    }
+
+    pub fn println_number(number: usize) {
+        unsafe { js_println_number(number) };
     }
 
     /// Print to the console

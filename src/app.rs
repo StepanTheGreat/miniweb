@@ -55,11 +55,6 @@ macro_rules! make_app {
     ($ty:ident) => {
         static APP: AppCell<$ty> = AppCell::new();
 
-        const fn __() {
-            __satisfies_trait(unsafe { APP.get() });
-        }
-        const fn __satisfies_trait<T: AppHandler>(_: &T) {}
-
         unsafe fn init_app(app: $ty) {
             unsafe { APP.init(app) };
         } 

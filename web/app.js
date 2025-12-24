@@ -1,3 +1,4 @@
+const PAGE_SIZE = Math.pow(2, 16);
 
 function assert(expr, message = "Assertion error") {
     if (!expr) {
@@ -18,12 +19,25 @@ if (ctx === null) {
 } 
 
 const env = {
+    js_request_pages: function(pages) {
+        memory.grow(pages);
+    },
+
+    js_allocated_pages: function() {
+        return memory.buffer.byteLength / PAGE_SIZE
+    },
+
     js_println: function(start, length) {
         const view = new Uint8Array(memory.buffer, start, length);
         var enc = new TextDecoder("utf-8");
 
         console.log(enc.decode(view));
     },
+
+    js_println_number: function(num) {
+        console.log(num);
+    },
+
     js_alert: function(start, length) {
         const view = new Uint8Array(memory.buffer, start, length);
         var enc = new TextDecoder("utf-8");

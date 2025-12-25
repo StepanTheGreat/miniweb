@@ -1,7 +1,7 @@
 mod js {
     use core::ptr::null;
 
-    unsafe extern "C" {
+    unsafe extern "C" {        
         fn js_request_pages(pages: usize);
 
         fn js_allocated_pages() -> usize;
@@ -35,7 +35,11 @@ mod js {
 
     /// Print to the console
     pub fn println(message: &str) {
-        unsafe { js_println(message.as_ptr(), message.len()) }
+        unsafe { println_raw(message.as_ptr(), message.len()) }
+    }
+
+    pub unsafe fn println_raw(ptr: *const u8, len: usize) {
+        unsafe { js_println(ptr, len);}
     }
 
     /// Alert!!

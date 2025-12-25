@@ -1,34 +1,24 @@
 #![no_std]
 
 // Only for tests
-#[cfg(test)]
+#[cfg(not(target_family = "wasm"))]
 extern crate std;
 
 mod alloc;
 mod app;
+use core::{alloc::Layout, ptr::null_mut, str};
+
 pub use app::*;
 
-// mod heap;
 mod js;
 pub use js::*;
 
-mod gl;
-pub use gl::*;
+use crate::alloc::ConstVec;
 
-/// Get the heap base (the address from which the heap starts) 
-pub fn heap_base() -> *const u8 {
+// use crate::alloc2::alloc;
 
-    unsafe extern "C" {
-        static __heap_base: u8;
-    }
-
-    unsafe { &__heap_base as *const u8 }
-} 
-
-/// Ge the initial amount of pages allocated by rust
-pub fn initial_pages() -> usize {
-    (heap_base() as usize).div_ceil(2usize.pow(16))
-}
+// mod gl;
+// pub use gl::*;
 
 struct App;
 impl AppHandler for App {
@@ -37,16 +27,32 @@ impl AppHandler for App {
     }
 }
 
-fn main() -> App {
-    println_number(heap_base() as usize);
-    println_number((initial_pages() * 2usize.pow(16)) - heap_base() as usize);
+type ByteVec = ConstVec<u8, 2048>;
+static mut DATA: *mut ByteVec = null_mut();
 
-    println_number(initial_pages() as usize);
-    println_number(allocated_pages());
+fn main() -> App {    
+    // Allocate a pointer for our string
 
     unsafe {
-        glClearColor(0.2, 0.8, 1.0, 1.0);
-        glClear(GL_COLOR_BUFFER_BIT);
+        let ptr = alloc::alloc(Layout::from_size_align(
+            size_of::<ByteVec>(), 
+            align_of::<ByteVec>()
+        ).unwrap()) as *mut ByteVec;
+
+        ptr.write(ByteVec::new());
+
+        DATA = ptr;
+    }
+
+
+    let _ = unsafe {&mut *DATA }.push(67);
+    let _ = unsafe {&mut *DATA }.push(50);
+    let _ = unsafe {&mut *DATA }.push(99);
+
+    unsafe {
+        let strr = str::from_utf8_unchecked((&*DATA).as_slice());
+
+        println(strr);
     }
 
     App

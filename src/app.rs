@@ -1,7 +1,6 @@
 use core::cell::UnsafeCell;
 
-#[cfg(not(test))]
-#[cfg(target_arch = "wasm32")]
+#[cfg(target_family = "wasm")]
 #[panic_handler]
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     let msg = info.message().as_str();
@@ -31,21 +30,30 @@ impl<T: AppHandler> AppCell<T> {
     }
 
     pub unsafe fn init(&self, app: T) {
-        assert!(!self.is_init(), "The app is already initialised.");
-
-        unsafe { &mut *self.0.get() }.replace(app);
+        if !self.is_init() {
+            unsafe { &mut *self.0.get() }.replace(app);
+        }
     }
 
-    pub const unsafe fn get_mut(&self) -> &mut T {
-        assert!(self.is_init(), "The app isn't initialised");
+    pub const unsafe fn get_mut(&self) -> Option<&mut T> {
+        if !self.is_init() {
+            return None;
+        }
+        // assert!(self.is_init(), "The app isn't initialised");
 
-        unsafe { (&mut *self.0.get()).as_mut().unwrap() }
+        Some(
+            unsafe { (&mut *self.0.get()).as_mut().unwrap() }
+        )
     }
 
-    pub const unsafe fn get(&self) -> &T {
-        assert!(self.is_init(), "The app isn't initialised");
+    pub const unsafe fn get(&self) -> Option<&T> {
+        if !self.is_init() {
+            return None;
+        }
 
-        unsafe { (&*self.0.get()).as_ref().unwrap() }
+        Some(
+            unsafe { (&*self.0.get()).as_ref().unwrap() }
+        )
     }
 }
 
@@ -60,7 +68,7 @@ macro_rules! make_app {
         } 
 
         unsafe fn get_app<'a>() -> &'a mut $ty {
-            unsafe { APP.get_mut() }
+            unsafe { APP.get_mut().unwrap() }
         }
 
         

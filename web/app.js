@@ -9,6 +9,7 @@ function assert(expr, message = "Assertion error") {
 let instance;
 let memory;
 
+const encoder = new TextDecoder("utf-8");
 const canvas = document.createElement("canvas")
 document.body.appendChild(canvas);
 
@@ -19,55 +20,49 @@ if (ctx === null) {
 } 
 
 const env = {
-    js_request_pages: function(pages) {
+    js_request_pages(pages) {
         memory.grow(pages);
     },
 
-    js_allocated_pages: function() {
+    js_allocated_pages() {
         return memory.buffer.byteLength / PAGE_SIZE
     },
 
-    js_println: function(start, length) {
+    js_println(start, length) {
         const view = new Uint8Array(memory.buffer, start, length);
-        var enc = new TextDecoder("utf-8");
 
-        console.log(enc.decode(view));
+        console.log(encoder.decode(view));
     },
 
-    js_println_number: function(num) {
+    js_println_number(num) {
         console.log(num);
     },
 
-    js_alert: function(start, length) {
+    js_alert(start, length) {
         const view = new Uint8Array(memory.buffer, start, length);
-        var enc = new TextDecoder("utf-8");
-
-        alert(enc.decode(view));
+        alert(encoder.decode(view));
     },
 
-    js_panic: function(errPtr, errLen, filePtr, fileLen, line) {
-        const enc = new TextDecoder("utf-8");
-
+    js_panic(errPtr, errLen, filePtr, fileLen, line) {
         let message = "";
         if (errLen > 0) {
             const errView = new Uint8Array(memory.buffer, errPtr, errLen);
-            message = enc.decode(errView);
+            message = encoder.decode(errView);
         }
 
         const fileView = new Uint8Array(memory.buffer, filePtr, fileLen);
-        const filePath = enc.decode(fileView);
+        const filePath = encoder.decode(fileView);
 
         message = `Caught a panic in ${filePath} at line ${line} :\n${message}`;
 
-        alert(message);
         throw new Error(message);
     },
 
-    glClear: function(mask) {
+    glClear(mask) {
         ctx.clear(mask);
     },
 
-    glClearColor: function(red, green, blue, alpha) {
+    glClearColor(red, green, blue, alpha) {
         ctx.clearColor(red, green, blue, alpha)
     },
 };

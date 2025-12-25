@@ -21,3 +21,11 @@ esac
 
 # Copy it to the main directory
 cp ./target/wasm32-unknown-unknown/$outdir/$LIBNAME.wasm ./web/app.wasm
+
+# Optimize the size
+wasm-opt -Oz ./web/app.wasm -o ./web/app.wasm
+
+# Format the size of our binary
+bin_size=$(wc ./web/app.wasm -c | awk '{print $1}' | numfmt --to=iec)
+
+echo app.wasm was generated with $bin_size bytes of binary size

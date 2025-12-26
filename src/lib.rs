@@ -6,14 +6,14 @@ extern crate std;
 
 mod alloc;
 mod app;
-use core::{alloc::Layout, ptr::null_mut, str};
+use core::{ptr::null_mut, str};
 
 pub use app::*;
 
 mod js;
 pub use js::*;
 
-use crate::alloc::ConstVec;
+use crate::alloc::{ConstVec, layout_of};
 
 // use crate::alloc2::alloc;
 
@@ -34,10 +34,7 @@ fn main() -> App {
     // Allocate a pointer for our string
 
     unsafe {
-        let ptr = alloc::alloc(Layout::from_size_align(
-            size_of::<ByteVec>(), 
-            align_of::<ByteVec>()
-        ).unwrap()) as *mut ByteVec;
+        let ptr = alloc::alloc(layout_of::<ByteVec>()) as *mut ByteVec;
 
         ptr.write(ByteVec::new());
 

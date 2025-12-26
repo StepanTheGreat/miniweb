@@ -8,6 +8,7 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 
     crate::js::panic(msg, location.file(), location.line());
 
+    // Unreachable
     loop {}
 }
 

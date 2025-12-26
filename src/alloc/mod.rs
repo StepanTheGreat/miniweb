@@ -120,3 +120,14 @@ static ALLOCATOR: Allocator = Allocator::new();
 pub unsafe fn alloc(layout: Layout) -> *mut u8 {
     unsafe { ALLOCATOR.alloc(layout) }
 }
+
+pub fn layouts_of<T>(amount: usize) -> Layout {
+    Layout::from_size_align(
+        size_of::<T>() * amount, 
+        align_of::<T>()
+    ).unwrap()
+}
+
+pub fn layout_of<T>() -> Layout {
+    layouts_of::<T>(1)
+}

@@ -1,6 +1,6 @@
 use core::{
     mem::{MaybeUninit, transmute}, 
-    ops::{Index, IndexMut}
+    ops::{Index, IndexMut},
 };
 
 /// A vector of a constant size. Allows for push/pop operations, but,
@@ -43,16 +43,15 @@ impl<T, const S: usize> ConstVec<T, S> {
 
     /// Push an item onto the array
     /// 
-    /// This will return [Some], if the operation doesn't succeed
-    pub fn push(&mut self, item: T) -> Option<()> {
-        if self.is_full() { 
-            return Some(()); 
+    /// This will return [Some] if the operation doesn't succeed
+    /// 
+    /// NOTE: The binary explodes in size when I'm trying to return [Option<T>] instead of [Option<()>],
+    /// which is... interesting.
+    pub fn push(&mut self, item: T) {
+        if !self.is_full() { 
+            self.items[self.length].write(item);
+            self.length += 1;
         }
-
-        self.items[self.length].write(item);
-        self.length += 1;
-
-        None
     }
 
     /// Pop the top-most item from the array. This will return [None] if the

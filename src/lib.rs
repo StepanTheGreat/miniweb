@@ -15,10 +15,12 @@ pub use app::*;
 mod js;
 pub use js::*;
 
+mod game;
+
 // use crate::alloc2::alloc;
 
-// mod gl;
-// pub use gl::*;
+mod gl;
+pub use gl::*;
 
 struct App;
 impl AppHandler for App {

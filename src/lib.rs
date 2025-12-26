@@ -4,16 +4,16 @@
 #[cfg(not(target_family = "wasm"))]
 extern crate std;
 
+mod cell;
+pub use cell::*;
+
 mod alloc;
 mod app;
-use core::{ptr::null_mut, str};
 
 pub use app::*;
 
 mod js;
 pub use js::*;
-
-use crate::alloc::{ConstVec, layout_of};
 
 // use crate::alloc2::alloc;
 
@@ -27,30 +27,7 @@ impl AppHandler for App {
     }
 }
 
-type ByteVec = ConstVec<u8, 2048>;
-static mut DATA: *mut ByteVec = null_mut();
-
 fn main() -> App {    
-    // Allocate a pointer for our string
-
-    unsafe {
-        let ptr = alloc::alloc(layout_of::<ByteVec>()) as *mut ByteVec;
-
-        ptr.write(ByteVec::new());
-
-        DATA = ptr;
-    }
-
-
-    let _ = unsafe {&mut *DATA }.push(67);
-    let _ = unsafe {&mut *DATA }.push(50);
-    let _ = unsafe {&mut *DATA }.push(99);
-
-    unsafe {
-        let strr = str::from_utf8_unchecked((&*DATA).as_slice());
-
-        println(strr);
-    }
 
     App
 }
